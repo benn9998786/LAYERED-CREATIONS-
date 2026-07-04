@@ -1,4 +1,5 @@
 const http = require('node:http');
+const https = require('node:https');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
@@ -6,6 +7,7 @@ const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const UPLOAD_DIR = path.join(ROOT, 'uploads');
 const SPREADSHEET_PATH = path.join(ROOT, 'customer-requests.csv');
+const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL || '';
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const SPREADSHEET_COLUMNS = [
   'receivedAt',
@@ -65,6 +67,53 @@ async function appendSpreadsheetRow(details) {
   }
 
   await fs.appendFile(SPREADSHEET_PATH, row);
+}
+
+function buildGoogleSheetsPayload(details) {
+  return JSON.stringify(Object.fromEntries(SPREADSHEET_COLUMNS.map(column => [column, details[column] ?? ''])));
+}
+
+function forwardToGoogleSheets(details) {
+  if (!GOOGLE_SHEETS_WEBHOOK_URL) {
+    return Promise.resolve();
+  }
+
+  const payload = buildGoogleSheetsPayload(details);
+  const url = new URL(GOOGLE_SHEETS_WEBHOOK_URL);
+  const client = url.protocol === 'https:' ? https : http;
+
+  return new Promise((resolve, reject) => {
+    const req = client.request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port,
+        path: `${url.pathname}${url.search}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
+        }
+      },
+      (res) => {
+        let responseBody = '';
+        res.on('data', chunk => {
+          responseBody += chunk.toString();
+        });
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(responseBody);
+          } else {
+            reject(new Error(`Google Sheets request failed with ${res.statusCode}: ${responseBody}`));
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
 }
 
 function parseMultipart(body, boundary) {
@@ -154,6 +203,12 @@ async function handleQuoteRequest(req, res) {
   await fs.writeFile(path.join(requestDir, filename), filePart.content);
   await fs.writeFile(path.join(requestDir, 'request.json'), JSON.stringify(details, null, 2));
   await appendSpreadsheetRow(details);
+
+  try {
+    await forwardToGoogleSheets(details);
+  } catch (error) {
+    console.error('Unable to forward request to Google Sheets:', error.message);
+  }
 
   send(res, 200, JSON.stringify({ ok: true, requestId }), 'application/json');
 }
