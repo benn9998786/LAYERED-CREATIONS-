@@ -8,6 +8,10 @@ const ROOT = __dirname;
 const UPLOAD_DIR = path.join(ROOT, 'uploads');
 const SPREADSHEET_PATH = path.join(ROOT, 'customer-requests.csv');
 const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL || '';
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
+const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM || '';
+const TWILIO_WHATSAPP_TO = process.env.TWILIO_WHATSAPP_TO || '';
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const SPREADSHEET_COLUMNS = [
   'receivedAt',
@@ -116,6 +120,52 @@ function forwardToGoogleSheets(details) {
   });
 }
 
+function sendWhatsAppNotification(details, requestId) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_WHATSAPP_FROM || !TWILIO_WHATSAPP_TO) {
+    return Promise.resolve();
+  }
+
+  const message = `New quote request received!\nRequest ID: ${requestId}\nCustomer: ${details.customerName || 'Unknown'}\nEmail: ${details.customerEmail || 'N/A'}\nFile: ${details.originalFilename || 'Unknown'}\nMaterial: ${details.material || 'N/A'}`;
+  const body = new URLSearchParams({
+    From: TWILIO_WHATSAPP_FROM,
+    To: TWILIO_WHATSAPP_TO,
+    Body: message
+  });
+
+  const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+  const options = {
+    protocol: 'https:',
+    hostname: 'api.twilio.com',
+    path: `/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(body.toString())
+    }
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let responseBody = '';
+      res.on('data', chunk => {
+        responseBody += chunk.toString();
+      });
+      res.on('end', () => {
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(responseBody);
+        } else {
+          reject(new Error(`WhatsApp notification failed with ${res.statusCode}: ${responseBody}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(body.toString());
+    req.end();
+  });
+}
+
 function parseMultipart(body, boundary) {
   const delimiter = Buffer.from(`--${boundary}`);
   const parts = [];
@@ -208,6 +258,12 @@ async function handleQuoteRequest(req, res) {
     await forwardToGoogleSheets(details);
   } catch (error) {
     console.error('Unable to forward request to Google Sheets:', error.message);
+  }
+
+  try {
+    await sendWhatsAppNotification(details, requestId);
+  } catch (error) {
+    console.error('Unable to send WhatsApp notification:', error.message);
   }
 
   send(res, 200, JSON.stringify({ ok: true, requestId }), 'application/json');
