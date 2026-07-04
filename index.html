@@ -28,11 +28,28 @@
   *{box-sizing:border-box; margin:0; padding:0;}
   html{scroll-behavior:smooth;}
   body{
-    background:var(--bg);
+    background:linear-gradient(-45deg, #0B141F, #1a2332, #0f1c2a, #0B141F);
+    background-size:400% 400%;
     color:var(--text);
     font-family:var(--body);
     line-height:1.5;
     -webkit-font-smoothing:antialiased;
+    animation:gradientShift 15s ease infinite;
+    min-height:100vh;
+    position:relative;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:'';
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:radial-gradient(circle at 20% 50%, rgba(255,90,31,0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(76,143,196,0.05) 0%, transparent 50%);
+    pointer-events:none;
+    z-index:-1;
   }
   a{color:inherit; text-decoration:none;}
   ::selection{background:var(--accent); color:#fff;}
@@ -248,6 +265,52 @@
     0%, 100%{opacity:1;}
     50%{opacity:0.7;}
   }
+  @keyframes gradientShift{
+    0%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+    100%{background-position:0% 50%;}
+  }
+  @keyframes floatingGlow{
+    0%, 100%{transform:translateY(0px); opacity:0.3;}
+    50%{transform:translateY(-10px); opacity:0.8;}
+  }
+  @keyframes successCheck{
+    0%{stroke-dashoffset:24; transform:scale(0.5) rotate(-45deg);}
+    50%{stroke-dashoffset:0; transform:scale(1.2);}
+    100%{stroke-dashoffset:0; transform:scale(1) rotate(0deg);}
+  }
+  @keyframes successRipple{
+    0%{width:40px; height:40px; opacity:0.8;}
+    100%{width:120px; height:120px; opacity:0;}
+  }
+  @keyframes bounceArrow{
+    0%, 100%{transform:translateY(0);}
+    50%{transform:translateY(-8px);}
+  }
+  @keyframes slideInLeft{
+    from{opacity:0; transform:translateX(-30px);}
+    to{opacity:1; transform:translateX(0);}
+  }
+  @keyframes slideInRight{
+    from{opacity:0; transform:translateX(30px);}
+    to{opacity:1; transform:translateX(0);}
+  }
+  @keyframes countUp{
+    from{opacity:0;}
+    to{opacity:1;}
+  }
+  @keyframes particleFloat{
+    0%{transform:translate(0, 0) scale(1); opacity:1;}
+    100%{transform:translate(var(--tx), var(--ty)) scale(0); opacity:0;}
+  }
+  @keyframes neonGlow{
+    0%, 100%{text-shadow:0 0 10px rgba(255,90,31,0.5), 0 0 20px rgba(255,90,31,0.3);}
+    50%{text-shadow:0 0 20px rgba(255,90,31,0.8), 0 0 40px rgba(255,90,31,0.5), 0 0 60px rgba(255,90,31,0.3);}
+  }
+  @keyframes fadeOut{
+    from{opacity:1;}
+    to{opacity:0; transform:translate(var(--tx, 0px), var(--ty, 0px));}
+  }
   .analyzing-label{font-family:var(--mono); font-size:12px; color:var(--text-dim); letter-spacing:0.04em;}
   .filename-tag{font-family:var(--mono); font-size:12px; color:var(--text-faint);}
 
@@ -318,9 +381,21 @@
   .btn-ghost:active{transform:translateX(0);}
   .confirm-msg{
     font-family:var(--mono); font-size:12px; color:var(--ok); margin-top:14px; display:none;
-    animation:slideUp .4s ease-out;
+    animation:slideUp .4s ease-out, successRipple 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    position:relative;
+    background:rgba(111,211,174,0.1);
+    border:1px solid rgba(111,211,174,0.3);
+    border-radius:4px;
+    padding:12px 14px;
+    backdrop-filter:blur(4px);
+    box-shadow:0 0 16px rgba(111,211,174,0.2);
   }
-  .confirm-msg.error{color:var(--accent);}
+  .confirm-msg.error{
+    color:var(--accent);
+    background:rgba(255,90,31,0.1);
+    border-color:rgba(255,90,31,0.3);
+    box-shadow:0 0 16px rgba(255,90,31,0.2);
+  }
   .confirm-msg.show{display:block;}
 
   #file-input{display:none;}
@@ -368,17 +443,19 @@
   @media (max-width:900px){ .mat-grid{grid-template-columns:1fr 1fr;} }
   @media (max-width:600px){ .mat-grid{grid-template-columns:1fr;} }
   .mat-card{
-    border:1px solid var(--grid-major); border-radius:3px; padding:22px;
-    background:var(--panel-2); transition:all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border:1px solid rgba(76,143,196,0.3); border-radius:8px; padding:22px;
+    background:rgba(16,30,46,0.6); transition:all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
     animation:slideUp 0.6s ease-out backwards;
+    backdrop-filter:blur(10px);
+    box-shadow:0 8px 32px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.1);
   }
   .mat-card:nth-child(1){animation-delay:0.1s;}
   .mat-card:nth-child(2){animation-delay:0.2s;}
   .mat-card:nth-child(3){animation-delay:0.3s;}
   .mat-card:hover{
     border-color:var(--accent); transform:translateY(-8px) scale(1.02);
-    box-shadow:0 16px 32px rgba(255,90,31,0.2);
-    background:linear-gradient(135deg, var(--panel-2), rgba(255,90,31,0.05));
+    box-shadow:0 16px 40px rgba(255,90,31,0.3), inset 0 1px 1px rgba(255,255,255,0.2);
+    background:rgba(16,30,46,0.8);
   }
   .mat-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;}
   .mat-swatch{
@@ -842,6 +919,102 @@
     fileInput.value = '';
     currentFile = null;
   });
+
+  // ---------- Scroll-triggered animations ----------
+  const observerOptions = { threshold: 0.15, rootMargin: '0px 0px -50px 0px' };
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.animation = entry.target.dataset.animation;
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, observerOptions);
+
+  document.querySelectorAll('.section, .process-step, .mat-card, .spec-item').forEach(el => {
+    el.dataset.animation = 'slideUp 0.8s ease-out forwards';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    observer.observe(el);
+  });
+
+  // ---------- Particle burst on success ----------
+  function createParticles(x, y, count = 12) {
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const velocity = 3 + Math.random() * 4;
+      const tx = Math.cos(angle) * velocity * 60;
+      const ty = Math.sin(angle) * velocity * 60 - 30;
+
+      const particle = document.createElement('div');
+      particle.style.cssText = `
+        position: fixed;
+        left: ${x}px;
+        top: ${y}px;
+        width: 8px;
+        height: 8px;
+        background: linear-gradient(135deg, var(--accent), #ff6d38);
+        border-radius: 50%;
+        pointer-events: none;
+        box-shadow: 0 0 12px rgba(255,90,31,0.8);
+        --tx: ${tx}px;
+        --ty: ${ty}px;
+        animation: particleFloat 1.2s ease-out forwards;
+        z-index: 9999;
+      `;
+      document.body.appendChild(particle);
+      setTimeout(() => particle.remove(), 1200);
+    }
+  }
+
+  // Trigger particles on success
+  const confirmBtn = document.getElementById('confirm-btn');
+  if (confirmBtn) {
+    const originalClick = confirmBtn.onclick;
+    confirmBtn.onclick = async function(e) {
+      const result = await originalClick.call(this, e);
+      if (document.getElementById('confirm-msg').classList.contains('show') && 
+          !document.getElementById('confirm-msg').classList.contains('error')) {
+        createParticles(e.clientX, e.clientY);
+      }
+      return result;
+    };
+  }
+
+  // ---------- Neon glow pulse on price hover ----------
+  document.addEventListener('mouseover', e => {
+    if (e.target.matches('.price-row .amount') || e.target.matches('.quote-head h3')) {
+      e.target.style.animation = 'neonGlow 0.6s ease-out';
+    }
+  });
+
+  // ---------- Cursor trail effect ----------
+  let trailActive = false;
+  document.addEventListener('mousemove', e => {
+    if (!trailActive) return;
+    if (Math.random() > 0.8) {
+      const trail = document.createElement('div');
+      trail.style.cssText = `
+        position: fixed;
+        left: ${e.clientX}px;
+        top: ${e.clientY}px;
+        width: 6px;
+        height: 6px;
+        background: radial-gradient(circle, rgba(255,90,31,0.8), rgba(255,90,31,0.2));
+        border-radius: 50%;
+        pointer-events: none;
+        box-shadow: 0 0 8px rgba(255,90,31,0.6);
+        animation: fadeOut 0.6s ease-out forwards;
+        z-index: 9998;
+      `;
+      document.body.appendChild(trail);
+      setTimeout(() => trail.remove(), 600);
+    }
+  });
+
+  plate.addEventListener('mouseenter', () => { trailActive = true; });
+  plate.addEventListener('mouseleave', () => { trailActive = false; });
 </script>
 
 </body>
