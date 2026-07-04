@@ -26,6 +26,19 @@ const SPREADSHEET_COLUMNS = [
   'leadTime',
   'requestId'
 ];
+const MIME_TYPES = {
+  '.css': 'text/css; charset=utf-8',
+  '.gif': 'image/gif',
+  '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp'
+};
 
 function send(res, status, body, type = 'text/plain; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': type });
@@ -151,6 +164,43 @@ async function serveIndex(res) {
   res.end(html);
 }
 
+async function serveStatic(req, res) {
+  const requestPath = decodeURIComponent((req.url || '/').split('?')[0]);
+
+  if (requestPath === '/' || requestPath === '/index.html') {
+    return false;
+  }
+
+  const cleanPath = requestPath.replace(/^\/+/, '');
+  if (!cleanPath) {
+    return false;
+  }
+
+  const relativePath = cleanPath.replace(/^images\//i, '');
+  const filePath = path.resolve(path.join(ROOT, relativePath));
+
+  if (!filePath.startsWith(ROOT)) {
+    send(res, 403, 'Forbidden');
+    return true;
+  }
+
+  try {
+    const stats = await fs.stat(filePath);
+    if (!stats.isFile()) {
+      return false;
+    }
+
+    const body = await fs.readFile(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const type = MIME_TYPES[ext] || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': type });
+    res.end(body);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'POST' && req.url === '/api/quote-request') {
@@ -158,9 +208,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-      await serveIndex(res);
-      return;
+    if (req.method === 'GET') {
+      if (await serveStatic(req, res)) {
+        return;
+      }
+
+      if (req.url === '/' || req.url === '/index.html') {
+        await serveIndex(res);
+        return;
+      }
     }
 
     send(res, 404, 'Not found');
