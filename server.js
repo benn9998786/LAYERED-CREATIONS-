@@ -30,8 +30,16 @@ const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const UPLOAD_DIR = path.join(ROOT, 'uploads');
 const SPREADSHEET_PATH = path.join(ROOT, 'customer-requests.csv');
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_URL = (
+  process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  ''
+).replace(/\/$/, '');
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  '';
 const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'quote-uploads';
 const SUPABASE_REQUESTS_TABLE = process.env.SUPABASE_REQUESTS_TABLE || 'quote_requests';
 const SAVE_LOCAL_COPY = process.env.SAVE_LOCAL_COPY === 'true' || (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY);
@@ -440,6 +448,7 @@ const server = http.createServer(async (req, res) => {
 
     send(res, 404, 'Not found');
   } catch (error) {
+    console.error('Request failed:', error);
     send(res, 500, JSON.stringify({ error: error.message }), 'application/json');
   }
 });

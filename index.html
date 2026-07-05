@@ -902,11 +902,20 @@
           body: formData
         });
 
-        if (!response.ok) throw new Error('Upload failed');
+        if (!response.ok) {
+          let errorMessage = 'Upload failed';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            errorMessage = await response.text() || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
         confirmMsg.textContent = 'Request received - we will get back to you by WhatsApp or email shortly.';
         confirmMsg.classList.add('show', 'success');
       } catch (error) {
-        confirmMsg.textContent = 'Could not send the file. Please try again.';
+        confirmMsg.textContent = `Could not send the file: ${error.message}`;
         confirmMsg.classList.add('show', 'error');
       } finally {
         confirmBtn.disabled = false;
