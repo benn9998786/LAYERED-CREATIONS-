@@ -1,12 +1,40 @@
 const http = require('node:http');
 const https = require('node:https');
+const fsSync = require('node:fs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+
+function loadEnvFile() {
+  const envPath = path.join(__dirname, '.env');
+  if (!fsSync.existsSync(envPath)) return;
+
+  const lines = fsSync.readFileSync(envPath, 'utf8').split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const separator = trimmed.indexOf('=');
+    if (separator === -1) continue;
+
+    const key = trimmed.slice(0, separator).trim();
+    const value = trimmed.slice(separator + 1).trim().replace(/^['"]|['"]$/g, '');
+    if (key && process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadEnvFile();
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const UPLOAD_DIR = path.join(ROOT, 'uploads');
 const SPREADSHEET_PATH = path.join(ROOT, 'customer-requests.csv');
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'quote-uploads';
+const SUPABASE_REQUESTS_TABLE = process.env.SUPABASE_REQUESTS_TABLE || 'quote_requests';
+const SAVE_LOCAL_COPY = process.env.SAVE_LOCAL_COPY === 'true' || (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY);
 const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL || '';
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
@@ -30,6 +58,7 @@ const SPREADSHEET_COLUMNS = [
   'volume',
   'printTime',
   'leadTime',
+  'uploadPath',
   'requestId'
 ];
 const MIME_TYPES = {
@@ -58,6 +87,78 @@ function safeName(name) {
 function csvValue(value) {
   const text = String(value ?? '');
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function supabaseConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function supabaseRequest(pathname, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}${pathname}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      ...(options.headers || {})
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Supabase request failed with ${response.status}: ${body}`);
+  }
+
+  return response;
+}
+
+async function uploadFileToSupabase(filePart, requestId, filename) {
+  const uploadPath = `${requestId}/${filename}`;
+  const encodedPath = uploadPath.split('/').map(encodeURIComponent).join('/');
+
+  await supabaseRequest(`/storage/v1/object/${SUPABASE_STORAGE_BUCKET}/${encodedPath}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'x-upsert': 'false'
+    },
+    body: filePart.content
+  });
+
+  return uploadPath;
+}
+
+function toSupabaseRow(details) {
+  return {
+    request_id: details.requestId,
+    received_at: details.receivedAt,
+    customer_name: details.customerName || '',
+    customer_email: details.customerEmail || '',
+    customer_phone: details.customerPhone || '',
+    shipping_address: details.shippingAddress || '',
+    shipping_city: details.shippingCity || '',
+    shipping_pincode: details.shippingPincode || '',
+    customer_notes: details.customerNotes || '',
+    original_filename: details.originalFilename || '',
+    saved_filename: details.savedFilename || '',
+    upload_path: details.uploadPath || '',
+    material: details.material || '',
+    price: details.price || '',
+    weight: details.weight || '',
+    volume: details.volume || '',
+    print_time: details.printTime || '',
+    lead_time: details.leadTime || ''
+  };
+}
+
+async function insertRequestIntoSupabase(details) {
+  await supabaseRequest(`/rest/v1/${encodeURIComponent(SUPABASE_REQUESTS_TABLE)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal'
+    },
+    body: JSON.stringify(toSupabaseRow(details))
+  });
 }
 
 async function appendSpreadsheetRow(details) {
@@ -249,10 +350,17 @@ async function handleQuoteRequest(req, res) {
   details.receivedAt = new Date().toISOString();
   details.requestId = requestId;
 
-  await fs.mkdir(requestDir, { recursive: true });
-  await fs.writeFile(path.join(requestDir, filename), filePart.content);
-  await fs.writeFile(path.join(requestDir, 'request.json'), JSON.stringify(details, null, 2));
-  await appendSpreadsheetRow(details);
+  if (supabaseConfigured()) {
+    details.uploadPath = await uploadFileToSupabase(filePart, requestId, filename);
+    await insertRequestIntoSupabase(details);
+  }
+
+  if (SAVE_LOCAL_COPY) {
+    await fs.mkdir(requestDir, { recursive: true });
+    await fs.writeFile(path.join(requestDir, filename), filePart.content);
+    await fs.writeFile(path.join(requestDir, 'request.json'), JSON.stringify(details, null, 2));
+    await appendSpreadsheetRow(details);
+  }
 
   try {
     await forwardToGoogleSheets(details);
@@ -338,6 +446,12 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Layered Creations upload server running at http://localhost:${PORT}`);
-  console.log(`Uploaded quote requests will be saved in ${UPLOAD_DIR}`);
-  console.log(`Customer details spreadsheet will be saved at ${SPREADSHEET_PATH}`);
+  if (supabaseConfigured()) {
+    console.log(`Uploaded quote files will be saved in Supabase Storage bucket "${SUPABASE_STORAGE_BUCKET}"`);
+    console.log(`Customer quote requests will be saved in Supabase table "${SUPABASE_REQUESTS_TABLE}"`);
+  }
+  if (SAVE_LOCAL_COPY) {
+    console.log(`Uploaded quote requests will be saved in ${UPLOAD_DIR}`);
+    console.log(`Customer details spreadsheet will be saved at ${SPREADSHEET_PATH}`);
+  }
 });
