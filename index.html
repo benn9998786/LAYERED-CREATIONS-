@@ -51,6 +51,27 @@
     pointer-events:none;
     z-index:-1;
   }
+  /* Moving lines background */
+  body::after{
+    content:'';
+    position:fixed;
+    inset:0;
+    background:repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(255,255,255,0.02) 10px,
+      rgba(255,255,255,0.02) 20px
+    );
+    pointer-events:none;
+    z-index:-1;
+    animation:moveLines 12s linear infinite;
+    opacity:0.6;
+  }
+  @keyframes moveLines{
+    from{background-position:0 0;}
+    to{background-position:100% 100%;}
+  }
   a{color:inherit; text-decoration:none;}
   ::selection{background:var(--accent); color:#fff;}
 
@@ -154,7 +175,76 @@
   .hero-meta div:hover{transform:translateX(4px); color:var(--ok);}
   .hero-meta b:hover{color:#7be5bd;}
 
-  /* ---------- BUILD PLATE / DROPZONE ---------- */
+  /* ---------- PRELOADER ---------- */
+  #preloader{
+    position:fixed;
+    inset:0;
+    background:rgba(11,20,31,0.95);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:9999;
+    opacity:1;
+    transition:opacity .5s ease;
+  }
+  #preloader.hidden{
+    opacity:0;
+    pointer-events:none;
+  }
+  .printer{
+    position:relative;
+    width:200px;
+    height:150px;
+    background:var(--panel-2);
+    border:2px solid var(--grid-major);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .bed{
+    position:absolute;
+    bottom:0;
+    left:0;
+    width:100%;
+    height:20px;
+    background:var(--grid);
+  }
+  .nozzle{
+    position:absolute;
+    width:12px;
+    height:12px;
+    background:var(--accent);
+    border-radius:50%;
+    top:50%;
+    left:0;
+    transform:translateY(-50%);
+    animation:printMove 3s linear infinite;
+  }
+  @keyframes printMove{
+    0%{left:0;}
+    30%{left:calc(100% - 12px);}
+    35%{left:calc(100% - 12px); top:30%;}
+    65%{left:calc(100% - 12px); top:30%;}
+    70%{left:calc(100% - 12px); top:70%;}
+    100%{left:0; top:50%;}
+  }
+  .filament{
+    position:absolute;
+    left:0;
+    top:50%;
+    transform:translateY(-50%);
+    height:2px;
+    background:var(--accent);
+  }
+  @keyframes filamentWidth{
+    0%{width:0;}
+    30%{width:calc(100% - 12px);}
+    35%{width:calc(100% - 12px);}
+    65%{width:calc(100% - 12px);}
+    70%{width:calc(100% - 12px);}
+    100%{width:0;}
+  }
+  .printer .filament{animation: filamentWidth 3s linear infinite;}
+/* ---------- BUILD PLATE / DROPZONE ---------- */
   .plate-shell{margin-top:52px; animation:fadeIn 1.1s ease-out 0.25s both;}
   .plate{
     position:relative;
@@ -178,8 +268,6 @@
     animation:pulse .6s ease-in-out infinite;
   }
   .plate.has-file{border-color:var(--grid-major);}
-
-  /* major grid lines every 200px */
   .plate::before{
     content:'';
     position:absolute; inset:0;
@@ -188,31 +276,26 @@
       repeating-linear-gradient(90deg, var(--grid-major) 0 1px, transparent 1px 200px);
     pointer-events:none;
   }
-
   .corner{position:absolute; width:22px; height:22px; border:2px solid var(--text-faint); pointer-events:none; transition:all .3s ease;}
   .plate.dragging .corner{border-color:var(--accent);}
   .corner.tl{top:14px; left:14px; border-right:none; border-bottom:none;}
   .corner.tr{top:14px; right:14px; border-left:none; border-bottom:none;}
   .corner.bl{bottom:14px; left:14px; border-right:none; border-top:none;}
   .corner.br{bottom:14px; right:14px; border-left:none; border-top:none;}
-
   .axis-x, .axis-y{
     position:absolute; font-family:var(--mono); font-size:10px; color:var(--text-faint);
     pointer-events:none;
     transition:color .2s ease;
   }
   .axis-x{bottom:6px; left:44px; right:44px; display:flex; justify-content:space-between;}
-  .axis-y{top:44px; bottom:44px; left:6px; display:flex; flex-direction:column; justify-content:space-between;}
+  .axis-y{top:44px; bottom:44px; left:6px; display:flex; flex-direction: column; justify-content:space-between;}
   .plate.dragging .axis-x, .plate.dragging .axis-y{color:var(--accent);}
-
   .plate-content{
     position:relative; z-index:2;
     min-height:280px;
     display:flex; align-items:center; justify-content:center;
     text-align:center;
   }
-
-  /* --- state: idle drop prompt --- */
   .drop-idle{display:flex; flex-direction:column; align-items:center; gap:16px; cursor:pointer; transition:all .2s ease;}
   .drop-idle:hover{transform:scale(1.02);}
   .drop-icon{
@@ -233,8 +316,6 @@
     letter-spacing:0.05em; margin-top:4px;
   }
   .formats span{margin:0 6px;}
-
-  /* --- state: analyzing --- */
   .analyzing{display:none; flex-direction:column; align-items:center; gap:18px; width:100%; max-width:360px; animation:slideUp .4s ease-out;}
   .analyzing.active{display:flex;}
   .nozzle-track{
@@ -256,14 +337,6 @@
   @keyframes slideUp{
     from{opacity:0; transform:translateY(16px);}
     to{opacity:1; transform:translateY(0);}
-  }
-  @keyframes glow{
-    0%, 100%{box-shadow:0 0 0 0 rgba(255,90,31,0.4);}
-    50%{box-shadow:0 0 0 8px rgba(255,90,31,0);}
-  }
-  @keyframes pulse{
-    0%, 100%{opacity:1;}
-    50%{opacity:0.7;}
   }
   @keyframes gradientShift{
     0%{background-position:0% 50%;}
@@ -313,8 +386,6 @@
   }
   .analyzing-label{font-family:var(--mono); font-size:12px; color:var(--text-dim); letter-spacing:0.04em;}
   .filename-tag{font-family:var(--mono); font-size:12px; color:var(--text-faint);}
-
-  /* --- state: quote result --- */
   .quote{display:none; width:100%; max-width:560px; text-align:left;}
   .quote.active{display:block; animation:slideUp .5s ease-out;}
   .quote-head{
@@ -403,10 +474,7 @@
     box-shadow:0 0 16px rgba(255,90,31,0.2);
   }
   .confirm-msg.show{display:block;}
-
   #file-input{display:none;}
-
-  /* ---------- PROCESS ---------- */
   .process{padding:120px 0 100px; border-top:1px solid var(--grid);}
   .section-head{max-width:560px; margin-bottom:56px; animation:fadeIn .8s ease-out;}
   .section-eyebrow{
@@ -419,7 +487,6 @@
   .section-head:hover h2{color:var(--accent);}
   .section-sub{color:var(--text-dim); margin-top:12px; font-size:15px; transition:color .2s ease;}
   .section-head:hover .section-sub{color:var(--text);}
-
   .steps{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--grid); border:1px solid var(--grid);}
   .step{
     background:var(--panel-2); padding:30px 24px; min-height:190px; display:flex; flex-direction:column; justify-content:space-between;
@@ -442,8 +509,6 @@
   .step:hover p{color:var(--text);}
   @media (max-width:900px){ .steps{grid-template-columns:1fr 1fr;} }
   @media (max-width:560px){ .steps{grid-template-columns:1fr;} }
-
-  /* ---------- MATERIALS ---------- */
   .materials{padding:100px 0; border-top:1px solid var(--grid);}
   .mat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
   @media (max-width:900px){ .mat-grid{grid-template-columns:1fr 1fr;} }
@@ -479,8 +544,6 @@
   .mat-spec-row .k{color:var(--text-faint);}
   .mat-spec-row .v{color:var(--text-dim); transition:color .2s ease;}
   .mat-card:hover .mat-spec-row .v{color:var(--text);}
-
-  /* ---------- SPECS STRIP ---------- */
   .specs-strip{border-top:1px solid var(--grid); border-bottom:1px solid var(--grid); background:var(--panel-2); transition:all .3s ease;}
   .specs-strip:hover{background:linear-gradient(90deg, var(--panel-2), rgba(255,90,31,0.05));}
   .specs-inner{
@@ -493,13 +556,10 @@
   .spec-item .k{font-family:var(--mono); font-size:10px; color:var(--text-faint); letter-spacing:0.08em; text-transform:uppercase;}
   .spec-item .v{font-family:var(--mono); font-size:16px; color:var(--text); margin-top:6px; transition:all .2s ease;}
   .spec-item:hover .v{color:var(--accent); font-size:18px;}
-
-  /* ---------- CTA FOOTER ---------- */
   .cta-block{padding:120px 0; text-align:center; border-top:1px solid var(--grid); animation:fadeIn 1s ease-out;}
   .cta-block h2{font-size:clamp(28px,4.2vw,44px); max-width:640px; margin:0 auto 26px;}
   .cta-block .hero-sub{margin:0 auto;}
   .cta-block .nav-cta{display:inline-block; margin-top:30px; padding:14px 28px; font-size:13px;}
-
   footer{border-top:1px solid var(--grid); padding:44px 0; animation:fadeIn 1.2s ease-out;}
   .footer-inner{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px;}
   footer .logo img{width:48px; height:48px; transition:transform .3s ease;}
@@ -510,7 +570,6 @@
   .footer-links a:hover{color:var(--accent);}
   .footer-links a:hover::after{width:100%;}
   .fine{font-family:var(--mono); font-size:11px; color:var(--text-faint);}
-
   @media (prefers-reduced-motion: reduce){
     .nozzle-dot{animation:none; left:50%;}
     html{scroll-behavior:auto;}
@@ -529,6 +588,14 @@
 </style>
 </head>
 <body>
+  <!-- Preloader -->
+  <div id="preloader">
+    <div class="printer">
+      <div class="bed"></div>
+      <div class="filament"></div>
+      <div class="nozzle"></div>
+    </div>
+  </div>
 
 <header class="nav">
   <div class="nav-inner">
@@ -553,7 +620,7 @@
     <h1 class="hero-title">Send a file. <span>We print the part.</span></h1>
     <p class="hero-sub">Drop an STL, get a price, a lead time, and a material recommendation before you've finished your coffee. No account, no back-and-forth, no minimum order.</p>
     <div class="hero-meta">
-      <div><b>&lt;60 sec</b> to quote</div>
+      <div><b><60 sec</b> to quote</div>
       <div><b>PLA+</b> material on the shelf</div>
       <div><b>±0.1mm</b> typical tolerance</div>
       <div><b>24–72hr</b> turnaround</div>
@@ -737,7 +804,7 @@
       <a href="#upload">Upload</a>
     </div>
     <div class="fine">© 2026 LAYERED CREATIONS 3D STUDIO
- 3D. Origin at X0 Y0 Z0.</div>
+  3D. Origin at X0 Y0 Z0.</div>
   </div>
 </footer>
 
@@ -1003,33 +1070,13 @@
     }
   });
 
-  // ---------- Cursor trail effect ----------
-  let trailActive = false;
-  document.addEventListener('mousemove', e => {
-    if (!trailActive) return;
-    if (Math.random() > 0.8) {
-      const trail = document.createElement('div');
-      trail.style.cssText = `
-        position: fixed;
-        left: ${e.clientX}px;
-        top: ${e.clientY}px;
-        width: 6px;
-        height: 6px;
-        background: radial-gradient(circle, rgba(255,90,31,0.8), rgba(255,90,31,0.2));
-        border-radius: 50%;
-        pointer-events: none;
-        box-shadow: 0 0 8px rgba(255,90,31,0.6);
-        animation: fadeOut 0.6s ease-out forwards;
-        z-index: 9998;
-      `;
-      document.body.appendChild(trail);
-      setTimeout(() => trail.remove(), 600);
-    }
+  // ---------- Hide preloader when page loads ----------
+  window.addEventListener('load', () => {
+    const preloader = document.getElementById('preloader');
+    preloader.classList.add('hidden');
+    // Optionally remove from DOM after transition
+    setTimeout(() => preloader.remove(), 600);
   });
-
-  plate.addEventListener('mouseenter', () => { trailActive = true; });
-  plate.addEventListener('mouseleave', () => { trailActive = false; });
 </script>
-
 </body>
 </html>
