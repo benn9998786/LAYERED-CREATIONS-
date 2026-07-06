@@ -49,29 +49,20 @@
     background:radial-gradient(circle at 20% 50%, rgba(255,90,31,0.05) 0%, transparent 50%),
                 radial-gradient(circle at 80% 80%, rgba(76,143,196,0.05) 0%, transparent 50%);
     pointer-events:none;
-    z-index:-1;
+    z-index:-2;
   }
-  /* Moving lines background */
-  body::after{
-    content:'';
+
+  /* ---------- Animated build-plate background (canvas) ---------- */
+  #bg-canvas{
     position:fixed;
     inset:0;
-    background:repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 10px,
-      rgba(255,255,255,0.02) 10px,
-      rgba(255,255,255,0.02) 20px
-    );
-    pointer-events:none;
+    width:100%;
+    height:100%;
     z-index:-1;
-    animation:moveLines 12s linear infinite;
-    opacity:0.6;
+    pointer-events:none;
+    display:block;
   }
-  @keyframes moveLines{
-    from{background-position:0 0;}
-    to{background-position:100% 100%;}
-  }
+
   a{color:inherit; text-decoration:none;}
   ::selection{background:var(--accent); color:#fff;}
 
@@ -179,7 +170,7 @@
   #preloader{
     position:fixed;
     inset:0;
-    background:rgba(11,20,31,0.95);
+    background:rgba(11,20,31,0.97);
     display:flex;
     align-items:center;
     justify-content:center;
@@ -191,59 +182,102 @@
     opacity:0;
     pointer-events:none;
   }
-  .printer{
-    position:relative;
-    width:200px;
-    height:150px;
-    background:var(--panel-2);
-    border:2px solid var(--grid-major);
-    border-radius:4px;
-    overflow:hidden;
+  .preloader-inner{
+    display:flex; flex-direction:column; align-items:center; gap:22px;
   }
-  .bed{
-    position:absolute;
-    bottom:0;
-    left:0;
-    width:100%;
-    height:20px;
-    background:var(--grid);
+  .printer-rig{
+    width:220px; height:190px;
+    overflow:visible;
+    filter:drop-shadow(0 0 18px rgba(255,90,31,0.08));
   }
-  .nozzle{
-    position:absolute;
-    width:12px;
-    height:12px;
-    background:var(--accent);
-    border-radius:50%;
-    top:50%;
-    left:0;
-    transform:translateY(-50%);
-    animation:printMove 3s linear infinite;
+  .rig-frame{ fill:none; stroke:var(--grid-major); stroke-width:2; }
+  .rig-rail{ stroke:var(--grid-major); stroke-width:2; }
+  .rig-plate{ fill:var(--grid); }
+  .rig-plate-top{ stroke:var(--line); stroke-width:1.5; opacity:.7; }
+  .rig-layer{
+    fill:var(--line);
+    opacity:0;
+    animation:rigLayerPop 4s ease-in-out infinite;
   }
-  @keyframes printMove{
-    0%{left:0;}
-    30%{left:calc(100% - 12px);}
-    35%{left:calc(100% - 12px); top:30%;}
-    65%{left:calc(100% - 12px); top:30%;}
-    70%{left:calc(100% - 12px); top:70%;}
-    100%{left:0; top:50%;}
+  .rig-layer.l0{animation-delay:0s;}
+  .rig-layer.l1{animation-delay:.4s;}
+  .rig-layer.l2{animation-delay:.8s;}
+  .rig-layer.l3{animation-delay:1.2s;}
+  .rig-layer.l4{animation-delay:1.6s;}
+  .rig-layer.l5{animation-delay:2.0s;}
+  .rig-layer.l6{animation-delay:2.4s;}
+  .rig-layer.l7{animation-delay:2.8s;}
+  @keyframes rigLayerPop{
+    0%{opacity:0; transform:scaleY(.4); transform-origin:bottom;}
+    5%{opacity:1; transform:scaleY(1);}
+    88%{opacity:1; transform:scaleY(1);}
+    96%{opacity:0; transform:scaleY(1);}
+    100%{opacity:0;}
   }
-  .filament{
-    position:absolute;
-    left:0;
-    top:50%;
-    transform:translateY(-50%);
-    height:2px;
-    background:var(--accent);
+  .rig-gantry{
+    animation:rigRise 4s steps(8,end) infinite;
   }
-  @keyframes filamentWidth{
-    0%{width:0;}
-    30%{width:calc(100% - 12px);}
-    35%{width:calc(100% - 12px);}
-    65%{width:calc(100% - 12px);}
-    70%{width:calc(100% - 12px);}
-    100%{width:0;}
+  @keyframes rigRise{
+    0%{transform:translateY(0);}
+    100%{transform:translateY(-64px);}
   }
-  .printer .filament{animation: filamentWidth 3s linear infinite;}
+  .rig-head{
+    animation:rigSlide 1.15s cubic-bezier(.65,0,.35,1) infinite;
+  }
+  @keyframes rigSlide{
+    0%{transform:translateX(0);}
+    50%{transform:translateX(148px);}
+    100%{transform:translateX(0);}
+  }
+  .head-body{ fill:var(--panel-2); stroke:var(--accent); stroke-width:1.5; }
+  .head-nozzle{ fill:var(--accent); }
+  .head-glow{ fill:var(--accent); opacity:.35; }
+  .rig-spool-outer{ fill:none; stroke:var(--grid-major); stroke-width:2; }
+  .rig-spool-coil{
+    fill:none; stroke:var(--accent); stroke-width:1.5;
+    stroke-dasharray:5 4;
+    animation:rigSpin 2.2s linear infinite;
+    transform-origin:235px 34px;
+  }
+  @keyframes rigSpin{ to{ transform:rotate(360deg); } }
+  .rig-feed{
+    stroke:var(--accent-dim); stroke-width:1.2; stroke-dasharray:3 3; opacity:.6;
+    animation:rigFeed 1s linear infinite;
+  }
+  @keyframes rigFeed{ to{ stroke-dashoffset:-12; } }
+  .rig-led{
+    fill:var(--ok);
+    animation:rigBlink 1.6s ease-in-out infinite;
+  }
+  @keyframes rigBlink{
+    0%,100%{opacity:1;} 50%{opacity:.25;}
+  }
+  .rig-readout{
+    font-family:var(--mono); width:220px;
+  }
+  .rig-readout-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:11px; letter-spacing:.06em; color:var(--text-faint); margin-bottom:8px;
+  }
+  .rig-readout-row .rig-status{ color:var(--text-dim); }
+  .rig-bar{
+    width:100%; height:3px; background:var(--grid-major); border-radius:2px; overflow:hidden;
+  }
+  .rig-bar-fill{
+    height:100%; width:0%; background:var(--accent);
+    box-shadow:0 0 8px rgba(255,90,31,.6);
+    animation:rigProgress 4s linear infinite;
+  }
+  @keyframes rigProgress{
+    0%{width:0%;} 100%{width:100%;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .rig-gantry, .rig-head, .rig-layer, .rig-spool-coil, .rig-feed, .rig-led, .rig-bar-fill{
+      animation:none !important;
+    }
+    .rig-layer{ opacity:1; transform:none; }
+    .rig-bar-fill{ width:60%; }
+  }
 /* ---------- BUILD PLATE / DROPZONE ---------- */
   .plate-shell{margin-top:52px; animation:fadeIn 1.1s ease-out 0.25s both;}
   .plate{
@@ -588,12 +622,55 @@
 </style>
 </head>
 <body>
+  <!-- Animated background: a build plate quietly tracing toolpaths behind the whole page -->
+  <canvas id="bg-canvas" aria-hidden="true"></canvas>
+
   <!-- Preloader -->
   <div id="preloader">
-    <div class="printer">
-      <div class="bed"></div>
-      <div class="filament"></div>
-      <div class="nozzle"></div>
+    <div class="preloader-inner">
+      <svg class="printer-rig" viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- frame -->
+        <rect class="rig-frame" x="18" y="14" width="206" height="164" rx="4"></rect>
+        <!-- z rails -->
+        <line class="rig-rail" x1="34" y1="14" x2="34" y2="178"></line>
+        <line class="rig-rail" x1="208" y1="14" x2="208" y2="178"></line>
+        <!-- build plate -->
+        <rect class="rig-plate" x="34" y="166" width="174" height="8"></rect>
+        <line class="rig-plate-top" x1="34" y1="166" x2="208" y2="166"></line>
+
+        <!-- printed part: layers stack up from the plate -->
+        <g>
+          <rect class="rig-layer l0" x="96" y="152" width="70" height="14"></rect>
+          <rect class="rig-layer l1" x="100" y="140" width="62" height="13"></rect>
+          <rect class="rig-layer l2" x="104" y="128" width="54" height="13"></rect>
+          <rect class="rig-layer l3" x="107" y="116" width="48" height="13"></rect>
+          <rect class="rig-layer l4" x="110" y="104" width="42" height="13"></rect>
+          <rect class="rig-layer l5" x="113" y="92"  width="36" height="13"></rect>
+          <rect class="rig-layer l6" x="116" y="80"  width="30" height="13"></rect>
+          <rect class="rig-layer l7" x="119" y="68"  width="24" height="13"></rect>
+        </g>
+
+        <!-- filament spool -->
+        <circle class="rig-spool-outer" cx="235" cy="34" r="15"></circle>
+        <circle class="rig-spool-coil" cx="235" cy="34" r="10"></circle>
+
+        <!-- gantry: rises in steps as each layer completes -->
+        <g class="rig-gantry">
+          <line class="rig-rail" x1="34" y1="30" x2="208" y2="30" stroke-width="3"></line>
+          <path class="rig-feed" d="M 224 34 Q 200 34 200 30 L 62 30"></path>
+          <!-- carriage: slides left/right along the gantry -->
+          <g class="rig-head" transform="translate(52,30)">
+            <rect class="head-body" x="-10" y="0" width="20" height="16" rx="2"></rect>
+            <polygon class="head-nozzle" points="-5,16 5,16 0,25"></polygon>
+            <circle class="head-glow" cx="0" cy="25" r="7"></circle>
+            <circle class="rig-led" cx="0" cy="6" r="1.6"></circle>
+          </g>
+        </g>
+      </svg>
+      <div class="rig-readout">
+        <div class="rig-readout-row"><span>PLC-01</span><span class="rig-status" id="rig-status">HOMING AXES</span></div>
+        <div class="rig-bar"><div class="rig-bar-fill"></div></div>
+      </div>
     </div>
   </div>
 
@@ -1070,13 +1147,250 @@
     }
   });
 
+  // ---------- Preloader status readout ----------
+  const rigStatusEl = document.getElementById('rig-status');
+  const rigMessages = ['HOMING AXES', 'HEATING NOZZLE', 'LOADING FILAMENT', 'PRINTING LAYERS'];
+  let rigMsgIndex = 0;
+  let rigStatusTimer = null;
+  if (rigStatusEl){
+    rigStatusTimer = setInterval(() => {
+      rigMsgIndex = (rigMsgIndex + 1) % rigMessages.length;
+      rigStatusEl.textContent = rigMessages[rigMsgIndex];
+    }, 1000);
+  }
+
   // ---------- Hide preloader when page loads ----------
-  window.addEventListener('load', () => {
+  // The page itself loads almost instantly, but the print-rig animation
+  // has a real story to tell (home -> heat -> load filament -> print).
+  // Keep it on screen for at least one full loop so it's actually seen,
+  // rather than flashing past before the first layer even pops in.
+  const MIN_PRELOADER_MS = 4200;
+  const preloaderStart = Date.now();
+  function hidePreloader(){
     const preloader = document.getElementById('preloader');
-    preloader.classList.add('hidden');
-    // Optionally remove from DOM after transition
-    setTimeout(() => preloader.remove(), 600);
-  });
+    if (!preloader) return;
+    const elapsed = Date.now() - preloaderStart;
+    const remaining = Math.max(0, MIN_PRELOADER_MS - elapsed);
+    setTimeout(() => {
+      preloader.classList.add('hidden');
+      if (rigStatusTimer) clearInterval(rigStatusTimer);
+      setTimeout(() => preloader.remove(), 600);
+    }, remaining);
+  }
+  if (document.readyState === 'complete') {
+    hidePreloader();
+  } else {
+    window.addEventListener('load', hidePreloader);
+  }
+
+  // ==================================================================
+  // ---------- Animated background: slicer previews, quietly ----------
+  // ==================================================================
+  // Signature element: the whole page reads as one giant build plate.
+  // A faint machined grid sits behind everything, and a handful of
+  // "jobs" render across it the way a slicer preview does — an outline
+  // traces itself in, infill hatching fills in behind it, the part
+  // holds for a moment, then fades so the plate can start the next one.
+  (function initBackground(){
+    const canvas = document.getElementById('bg-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0;
+
+    function resize(){
+      W = window.innerWidth;
+      H = document.documentElement.scrollHeight; // cover full scrollable page
+      canvas.width = Math.floor(W * dpr);
+      canvas.height = Math.floor(H * dpr);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('load', resize);
+
+    const GRID_STEP = 56;
+    const gridColor = 'rgba(76,143,196,0.045)';
+    const gridMajorColor = 'rgba(76,143,196,0.085)';
+
+    function drawGrid(){
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x=0; x<=W; x+=GRID_STEP){ ctx.moveTo(x+0.5, 0); ctx.lineTo(x+0.5, H); }
+      for (let y=0; y<=H; y+=GRID_STEP){ ctx.moveTo(0, y+0.5); ctx.lineTo(W, y+0.5); }
+      ctx.stroke();
+
+      ctx.strokeStyle = gridMajorColor;
+      ctx.beginPath();
+      const majorStep = GRID_STEP * 4;
+      for (let x=0; x<=W; x+=majorStep){ ctx.moveTo(x+0.5, 0); ctx.lineTo(x+0.5, H); }
+      for (let y=0; y<=H; y+=majorStep){ ctx.moveTo(0, y+0.5); ctx.lineTo(W, y+0.5); }
+      ctx.stroke();
+    }
+
+    // ---- Slicer-preview "jobs" ----
+    const HATCH_SPACING = 11;
+    const OUTLINE_STEP  = 1/95;   // ~1.6s to trace the perimeter
+    const INFILL_STEP   = 1/7;    // ~7 frames per hatch line
+    const HOLD_FRAMES   = 85;     // pause once fully printed
+    const FADE_STEP     = 1/38;   // fade-out speed
+
+    function spawnJob(index){
+      const w = 90 + Math.random()*150;
+      const h = 70 + Math.random()*120;
+      return {
+        x: Math.random()*Math.max(1,(W-w)),
+        y: Math.random()*Math.max(1,(H-h)),
+        w, h,
+        hue: index % 2 === 0 ? 'accent' : 'line',
+        phase: 'outline',
+        progress: 0,
+        hatchCount: Math.max(4, Math.floor(h/HATCH_SPACING)),
+        hatchDrawn: 0,
+        holdTimer: HOLD_FRAMES,
+        fadeAlpha: 1
+      };
+    }
+
+    const JOB_COUNT = 3;
+    let jobs = [];
+    for (let i=0;i<JOB_COUNT;i++){
+      const j = spawnJob(i);
+      // stagger initial phases so they don't all pulse in sync
+      j.progress = Math.random();
+      if (j.progress > 0.3){ j.phase = 'infill'; j.hatchDrawn = Math.random()*j.hatchCount; }
+      jobs.push(j);
+    }
+
+    function perimeterPoint(job, t){
+      // trace clockwise from top-left, t in [0,1]
+      const { x, y, w, h } = job;
+      const p = t * 4;
+      if (p < 1)      return { x: x + w*p,               y: y };
+      if (p < 2)      return { x: x + w,                 y: y + h*(p-1) };
+      if (p < 3)      return { x: x + w*(1-(p-2)),        y: y + h };
+      return              { x: x,                        y: y + h*(1-(p-3)) };
+    }
+
+    function stepJob(job){
+      if (job.phase === 'outline'){
+        job.progress += OUTLINE_STEP;
+        if (job.progress >= 1){ job.progress = 1; job.phase = 'infill'; }
+      } else if (job.phase === 'infill'){
+        job.hatchDrawn += INFILL_STEP;
+        if (job.hatchDrawn >= job.hatchCount){ job.hatchDrawn = job.hatchCount; job.phase = 'hold'; }
+      } else if (job.phase === 'hold'){
+        job.holdTimer -= 1;
+        if (job.holdTimer <= 0) job.phase = 'fade';
+      } else if (job.phase === 'fade'){
+        job.fadeAlpha -= FADE_STEP;
+        if (job.fadeAlpha <= 0) return 'respawn';
+      }
+      return null;
+    }
+
+    function drawJob(job){
+      const color = job.hue === 'accent' ? '255,90,31' : '76,143,196';
+      const alpha = job.phase === 'fade' ? Math.max(0, job.fadeAlpha) : 1;
+      if (alpha <= 0) return;
+
+      // outline
+      ctx.strokeStyle = `rgba(${color},${(0.20*alpha).toFixed(3)})`;
+      ctx.lineWidth = 1.2;
+      if (job.phase === 'outline'){
+        const steps = 40;
+        ctx.beginPath();
+        for (let i=0;i<=steps;i++){
+          const t = (job.progress) * (i/steps);
+          const pt = perimeterPoint(job, t);
+          if (i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.stroke();
+        // nozzle tip
+        const tip = perimeterPoint(job, job.progress);
+        const grad = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, 8);
+        grad.addColorStop(0, `rgba(${color},${(0.5*alpha).toFixed(3)})`);
+        grad.addColorStop(1, `rgba(${color},0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(tip.x, tip.y, 8, 0, Math.PI*2); ctx.fill();
+      } else {
+        // completed outline (infill / hold / fade)
+        ctx.strokeRect(job.x, job.y, job.w, job.h);
+
+        // infill hatching
+        ctx.strokeStyle = `rgba(${color},${(0.11*alpha).toFixed(3)})`;
+        ctx.lineWidth = 1;
+        const full = Math.floor(job.hatchDrawn);
+        ctx.beginPath();
+        for (let i=0; i<full; i++){
+          const ly = job.y + 6 + i*HATCH_SPACING;
+          if (ly >= job.y + job.h - 4) break;
+          ctx.moveTo(job.x + 4, ly);
+          ctx.lineTo(job.x + job.w - 4, ly);
+        }
+        ctx.stroke();
+
+        if (job.phase === 'infill'){
+          const frac = job.hatchDrawn - full;
+          const ly = job.y + 6 + full*HATCH_SPACING;
+          if (ly < job.y + job.h - 4){
+            const endX = job.x + 4 + (job.w - 8) * frac;
+            ctx.strokeStyle = `rgba(${color},0.16)`;
+            ctx.beginPath();
+            ctx.moveTo(job.x + 4, ly);
+            ctx.lineTo(endX, ly);
+            ctx.stroke();
+            const grad = ctx.createRadialGradient(endX, ly, 0, endX, ly, 7);
+            grad.addColorStop(0, `rgba(${color},0.5)`);
+            grad.addColorStop(1, `rgba(${color},0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(endX, ly, 7, 0, Math.PI*2); ctx.fill();
+          }
+        }
+      }
+
+      // corner ticks, like a bounding-box readout
+      ctx.strokeStyle = `rgba(${color},${(0.28*alpha).toFixed(3)})`;
+      ctx.lineWidth = 1.4;
+      const c = 8;
+      [[job.x,job.y,1,1],[job.x+job.w,job.y,-1,1],[job.x,job.y+job.h,1,-1],[job.x+job.w,job.y+job.h,-1,-1]].forEach(([cx,cy,dx,dy])=>{
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + c*dy);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(cx + c*dx, cy);
+        ctx.stroke();
+      });
+    }
+
+    function frame(){
+      ctx.clearRect(0, 0, W, H);
+      drawGrid();
+      for (let i=0;i<jobs.length;i++){
+        const result = stepJob(jobs[i]);
+        drawJob(jobs[i]);
+        if (result === 'respawn') jobs[i] = spawnJob(i);
+      }
+      if (!reduceMotion) requestAnimationFrame(frame);
+    }
+
+    // A window can grow (more content loads below the fold); keep the
+    // canvas sized to the full page so the grid never visibly ends.
+    const ro = new ResizeObserver(() => resize());
+    ro.observe(document.body);
+
+    if (reduceMotion){
+      // Draw a single calm frame and stop — no motion for people who asked for none.
+      drawGrid();
+      jobs.forEach(drawJob);
+    } else {
+      requestAnimationFrame(frame);
+    }
+  })();
 </script>
 </body>
 </html>
