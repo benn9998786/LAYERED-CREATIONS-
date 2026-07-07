@@ -6,6 +6,14 @@
 <title>LAYERED CREATIONS 3D STUDIO — Send a file. Get a part.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
 <style>
   :root{
     --bg:#0B141F;
@@ -429,6 +437,41 @@
   }
   .quote-head h3{font-family:var(--display); font-size:18px; color:#fff; font-weight:600; transition:color .2s ease;}
   .quote-head .qfile{font-family:var(--mono); font-size:11px; color:var(--text-faint);}
+  .viewer-block{margin-bottom:18px;}
+  .viewer-shell{
+    display:none; position:relative;
+    width:100%; height:230px;
+    background:radial-gradient(circle at 50% 35%, rgba(76,143,196,0.08), transparent 70%), var(--panel);
+    border:1px solid var(--grid-major); border-radius:4px; overflow:hidden;
+  }
+  .viewer-shell.active{display:block; animation:fadeIn .4s ease-out;}
+  .viewer-shell canvas{display:block; width:100%; height:100%; cursor:grab;}
+  .viewer-shell canvas:active{cursor:grabbing;}
+  .viewer-hint{
+    position:absolute; right:10px; bottom:8px;
+    font-family:var(--mono); font-size:10px; color:var(--text-faint);
+    letter-spacing:0.04em; pointer-events:none;
+  }
+  .viewer-badge{
+    position:absolute; left:10px; top:8px;
+    font-family:var(--mono); font-size:10px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--ok); border:1px solid rgba(111,211,174,0.35); background:rgba(111,211,174,0.08);
+    padding:3px 7px; border-radius:2px; pointer-events:none;
+  }
+  .viewer-fallback{
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    width:100%; min-height:150px; text-align:center;
+    border:1px dashed var(--grid-major); border-radius:4px; padding:22px;
+    color:var(--text-dim);
+  }
+  .viewer-fallback.active{display:flex; animation:fadeIn .4s ease-out;}
+  .viewer-fallback .vf-icon{
+    width:36px; height:36px; border:1.5px solid var(--text-faint); border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:14px; color:var(--text-faint);
+  }
+  .viewer-fallback .vf-text{font-size:13px; max-width:380px;}
+  .viewer-fallback .vf-ext{color:var(--accent); font-family:var(--mono);}
   .quote-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px 28px; margin-bottom:22px; animation:fadeIn .5s ease-out 0.1s both;}
   .qf{display:flex; flex-direction:column; gap:6px; animation:fadeIn .5s ease-out;}
   .qf label{font-family:var(--mono); font-size:10px; color:var(--text-faint); letter-spacing:0.08em; text-transform:uppercase;}
@@ -734,6 +777,19 @@
               <h3>Quote ready</h3>
               <span class="qfile" id="quote-filename"></span>
             </div>
+
+            <div class="viewer-block">
+              <div class="viewer-shell" id="viewer-shell">
+                <canvas id="viewer-canvas"></canvas>
+                <div class="viewer-badge">measured from mesh</div>
+                <div class="viewer-hint">drag to orbit · scroll to zoom</div>
+              </div>
+              <div class="viewer-fallback" id="viewer-fallback">
+                <div class="vf-icon">⧉</div>
+                <div class="vf-text">No in-browser preview for <span class="vf-ext" id="vf-ext">.STEP</span> files — the quote below uses an estimated volume instead of a measured one.</div>
+              </div>
+            </div>
+
             <div class="quote-grid">
               <div class="qf">
                 <label>Material</label>
@@ -744,11 +800,11 @@
                 <div class="val" id="q-time"></div>
               </div>
               <div class="qf">
-                <label>Est. volume</label>
+                <label id="q-volume-label">Est. volume</label>
                 <div class="val" id="q-volume"></div>
               </div>
               <div class="qf">
-                <label>Est. weight</label>
+                <label id="q-weight-label" title="Weight = volume × 1.24 g/cm³ (PLA density). Volume assumes the file's units are millimeters.">Est. weight</label>
                 <div class="val" id="q-weight"></div>
               </div>
             </div>
@@ -843,7 +899,7 @@
     <div class="section-head">
       <div class="section-eyebrow">On the shelf today</div>
       <h2>PLA+ ready for everyday prints</h2>
-      <p class="section-sub">All quotes use PLA+ at ₹5 per gram, based on the estimated print weight.</p>
+      <p class="section-sub">All quotes use PLA+ at ₹2.10 per gram, based on the estimated print weight.</p>
     </div>
     <div class="mat-grid" id="mat-grid"></div>
   </div>
@@ -885,13 +941,19 @@
   </div>
 </footer>
 
-<script>
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+  import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+  import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+
   // ---------- Material data ----------
   const materials = [
     { id:'pla',   name:'PLA+',            process:'FDM', color:'#4C8FC4',
       desc:'The default. Crisp detail, low warping, good for prototypes and display parts.',
       strength:'38 MPa', finish:'Matte, visible layer lines', best:'Prototypes, fixtures, models',
-      ratePerGram:5 },
+      ratePerGram:2.10 },
   ];
 
   const matGrid = document.getElementById('mat-grid');
@@ -923,6 +985,164 @@
     opt.textContent = `${m.name} (${m.process})`;
     matSelect.appendChild(opt);
   });
+
+  // ---------- 3D file previewer ----------
+  // Renders the actual uploaded mesh (STL / OBJ / PLY) in a small orbit-controlled
+  // viewport, and — because we now have real geometry in hand — computes the part's
+  // true volume from its triangles instead of guessing from file size.
+  // 3MF and STEP aren't parsed here (3MF needs a zip layer, STEP needs a CAD kernel),
+  // so those formats fall back to the old file-size heuristic and show a plain notice.
+  let viewerReady = false;
+  let scene, camera, renderer, controls, previewGroup, viewerShellEl, rafId, viewerResizeObs;
+
+  function initViewer(){
+    if (viewerReady) return;
+    viewerShellEl = document.getElementById('viewer-shell');
+    const canvas = document.getElementById('viewer-canvas');
+
+    renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10000);
+
+    scene.add(new THREE.HemisphereLight(0xbcd6ee, 0x0b141f, 1.15));
+    const key = new THREE.DirectionalLight(0xffffff, 1.4);
+    key.position.set(4, 6, 5);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0x4c8fc4, 0.55);
+    fill.position.set(-5, -2, -4);
+    scene.add(fill);
+
+    previewGroup = new THREE.Group();
+    scene.add(previewGroup);
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.enablePan = false;
+
+    viewerResizeObs = new ResizeObserver(() => resizeViewer());
+    viewerResizeObs.observe(viewerShellEl);
+
+    (function animate(){
+      rafId = requestAnimationFrame(animate);
+      previewGroup.rotation.y += 0.0025;
+      controls.update();
+      renderer.render(scene, camera);
+    })();
+
+    viewerReady = true;
+  }
+
+  function resizeViewer(){
+    if (!renderer || !viewerShellEl) return;
+    const w = viewerShellEl.clientWidth || 1;
+    const h = viewerShellEl.clientHeight || 1;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+
+  function clearPreview(){
+    if (!previewGroup) return;
+    [...previewGroup.children].forEach(child => {
+      previewGroup.remove(child);
+      child.traverse(node => {
+        if (node.geometry) node.geometry.dispose();
+        if (node.material) (Array.isArray(node.material) ? node.material : [node.material]).forEach(m => m.dispose());
+      });
+    });
+    previewGroup.rotation.set(0, 0, 0);
+  }
+
+  function previewMaterial(){
+    return new THREE.MeshStandardMaterial({ color: 0x4c8fc4, roughness: 0.55, metalness: 0.08 });
+  }
+
+  function frameObject(object3D){
+    clearPreview();
+    const box = new THREE.Box3().setFromObject(object3D);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const radius = Math.max(size.length() / 2, 0.001);
+
+    object3D.position.sub(center);
+    previewGroup.add(object3D);
+
+    camera.near = radius / 100;
+    camera.far = radius * 100;
+    camera.position.set(radius * 1.6, radius * 1.2, radius * 1.8);
+    camera.updateProjectionMatrix();
+    controls.target.set(0, 0, 0);
+    controls.minDistance = radius * 0.4;
+    controls.maxDistance = radius * 6;
+    controls.update();
+
+    resizeViewer();
+  }
+
+  // Signed-tetrahedron-volume sum over every triangle: a standard method for
+  // getting the enclosed volume of a closed triangle mesh straight from its
+  // vertices. Assumes the file's coordinates are in millimeters (the 3D-printing
+  // convention for STL/OBJ/PLY), so the result is divided down to cm³.
+  function computeMeshVolumeCm3(object3D){
+    let volumeMm3 = 0;
+    const p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3(), cr = new THREE.Vector3();
+    object3D.updateMatrixWorld(true);
+    object3D.traverse(node => {
+      if (!node.isMesh || !node.geometry) return;
+      const geom = node.geometry.index ? node.geometry.toNonIndexed() : node.geometry;
+      const pos = geom.attributes.position;
+      if (!pos) return;
+      for (let i = 0; i < pos.count; i += 3){
+        p1.fromBufferAttribute(pos, i).applyMatrix4(node.matrixWorld);
+        p2.fromBufferAttribute(pos, i + 1).applyMatrix4(node.matrixWorld);
+        p3.fromBufferAttribute(pos, i + 2).applyMatrix4(node.matrixWorld);
+        cr.crossVectors(p2, p3);
+        volumeMm3 += p1.dot(cr) / 6;
+      }
+    });
+    return Math.abs(volumeMm3) / 1000; // mm^3 -> cm^3
+  }
+
+  function readFileAs(file, as){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      if (as === 'text') reader.readAsText(file); else reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function loadPreviewGeometry(file){
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    initViewer();
+    try {
+      if (ext === 'stl'){
+        const buf = await readFileAs(file, 'arraybuffer');
+        const geometry = new STLLoader().parse(buf);
+        geometry.computeVertexNormals();
+        return { object3D: new THREE.Mesh(geometry, previewMaterial()), supported:true };
+      }
+      if (ext === 'obj'){
+        const text = await readFileAs(file, 'text');
+        const group = new OBJLoader().parse(text);
+        group.traverse(n => { if (n.isMesh) n.material = previewMaterial(); });
+        return { object3D: group, supported:true };
+      }
+      if (ext === 'ply'){
+        const buf = await readFileAs(file, 'arraybuffer');
+        const geometry = new PLYLoader().parse(buf);
+        geometry.computeVertexNormals();
+        return { object3D: new THREE.Mesh(geometry, previewMaterial()), supported:true };
+      }
+    } catch (err){
+      console.error('Preview parse failed:', err);
+      return { object3D:null, supported:false, failed:true };
+    }
+    return { object3D:null, supported:false }; // .3mf / .step / .stp
+  }
 
   // ---------- Dropzone logic ----------
   const plate = document.getElementById('plate');
@@ -962,36 +1182,64 @@
     return () => { h = (h*1103515245 + 12345) >>> 0; return (h % 10000) / 10000; };
   }
 
-  function handleFile(file){
+  async function handleFile(file){
     currentFile = file;
     dropIdle.style.display = 'none';
     quote.classList.remove('active');
+    document.getElementById('viewer-shell').classList.remove('active');
+    document.getElementById('viewer-fallback').classList.remove('active');
     analyzing.classList.add('active');
     analyzingFilename.textContent = file.name;
 
-    setTimeout(() => {
-      analyzing.classList.remove('active');
-      renderQuote(file);
-      quote.classList.add('active');
-    }, 1500);
+    const started = Date.now();
+    const preview = await loadPreviewGeometry(file);
+    const remaining = Math.max(0, 900 - (Date.now() - started)); // let the sweep animation actually be seen
+    await new Promise(r => setTimeout(r, remaining));
+
+    analyzing.classList.remove('active');
+    renderQuote(file, preview);
+    quote.classList.add('active');
   }
 
-  function renderQuote(file){
+  function renderQuote(file, preview){
     const rand = seededRandom(file.name + file.size);
-    const volumeCm3 = Math.max(4, Math.round((file.size / 4200) + rand()*30));
-    const weightG = Math.round(volumeCm3 * 1.24);
+
+    const viewerShellEl2 = document.getElementById('viewer-shell');
+    const viewerFallbackEl = document.getElementById('viewer-fallback');
+    let volumeCm3, measured = false;
+
+    if (preview && preview.supported && preview.object3D){
+      const v = computeMeshVolumeCm3(preview.object3D);
+      if (v > 0.05){
+        volumeCm3 = v;
+        measured = true;
+        frameObject(preview.object3D);
+        viewerShellEl2.classList.add('active');
+        viewerFallbackEl.classList.remove('active');
+      }
+    }
+    if (!measured){
+      volumeCm3 = Math.max(4, Math.round((file.size / 4200) + rand()*30));
+      viewerShellEl2.classList.remove('active');
+      viewerFallbackEl.classList.add('active');
+      document.getElementById('vf-ext').textContent = '.' + (file.name.split('.').pop() || '?').toUpperCase();
+    }
+
+    const weightG = Math.round(volumeCm3 * 1.24 * 10) / 10;
     const hours = Math.max(1, Math.round(volumeCm3 / 9 + rand()*3));
     const leadDays = hours > 30 ? 3 : (hours > 12 ? 2 : 1);
 
+    document.getElementById('q-volume-label').textContent = measured ? 'Volume (measured)' : 'Est. volume';
+    document.getElementById('q-weight-label').textContent = measured ? 'Weight (from mesh)' : 'Est. weight';
     document.getElementById('quote-filename').textContent = file.name;
-    document.getElementById('q-volume').textContent = volumeCm3 + ' cm³';
+    document.getElementById('q-volume').textContent = (measured ? volumeCm3.toFixed(1) : volumeCm3) + ' cm³';
     document.getElementById('q-weight').textContent = weightG + ' g';
     document.getElementById('q-time').textContent = hours + ' hr';
     document.getElementById('q-lead').textContent = leadDays + ' business day' + (leadDays>1?'s':'');
 
     function updatePrice(){
       const mat = materials.find(m => m.id === matSelect.value);
-      const price = weightG * mat.ratePerGram;
+      const price = Math.round(weightG * mat.ratePerGram);
       document.getElementById('q-price').textContent = '₹' + price.toLocaleString('en-IN');
     }
     matSelect.onchange = updatePrice;
@@ -1070,6 +1318,9 @@
 
   document.getElementById('reset-btn').addEventListener('click', () => {
     quote.classList.remove('active');
+    document.getElementById('viewer-shell').classList.remove('active');
+    document.getElementById('viewer-fallback').classList.remove('active');
+    clearPreview();
     document.getElementById('confirm-msg').classList.remove('show', 'error');
     document.querySelectorAll('.customer-form input, .customer-form textarea').forEach(field => {
       field.value = '';
